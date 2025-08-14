@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import { DragControls } from 'three/addons/controls/DragControls.js';
 import {GUI} from 'dat.gui';
-import {Cube} from './shapes.js';
+import {Cube, Sphere} from './shapes.js';
 
 const gui = new GUI();
 const rayCaster = new THREE.Raycaster();
@@ -11,21 +11,6 @@ const pointer = new THREE.Vector2();
 let dragObjectArray = [];
 let shapes = {};
 let selectedShape = "";
-
-let selectedCube = {
-  width: 0,
-  height: 0,
-  depth: 0,
-  color: "",
-  edit: () => {
-    console.log(selectedShape)
-    // selectedShape.cubeMesh.scale.x = selectedCube['x'];
-    // selectedShape.cubeMesh.scale.x = selectedCube['y'];
-    // selectedShape.cubeMesh.scale.x = selectedCube['z'];
-    // selectedShape.cubeMesh.material.color.set(selectedCube['color']);
-    // console.log(selectedShape)
-  }
-}
 
 let createCube = {
   width: 0,
@@ -38,17 +23,36 @@ let createCube = {
       let cube = new Cube(scene, createCube['color'], createCube['width'], createCube['height'], createCube['depth']);
       cube.cubeMesh.position.y = 0.50 + (0.485 * (cube.cubeGeometry.parameters.height - 1));
       dragObjectArray.push(cube.cubeMesh);
-      shapes[cube.cubeMesh.geometry.uuid] = cube;
+      shapes[cube.objectID] = cube;
     }
   }
 }
 
-let create = gui.addFolder("Create Cube");
-create.add(createCube, 'width', 0, 4, .1);
-create.add(createCube, 'height', 0, 4, .1);
-create.add(createCube, 'depth', 0, 4, .1);
-create.addColor(createCube, 'color');
-create.add(createCube, 'create');
+let createSphere = {
+  radius: 0.1,
+  widthSegments: 3,
+  heightSegments: 2,
+  color:  "#787FE8",
+  create: () => {
+    let sphere = new Sphere(scene, createSphere['color'], createSphere['radius'], createSphere['widthSegments'], createSphere['heightSegments']);
+    dragObjectArray.push(sphere.sphereMesh);
+    shapes[sphere.objectID] = sphere;
+  }
+}
+
+let cubeFolder = gui.addFolder("Create Cube");
+cubeFolder.add(createCube, 'width', 0, 4, .1);
+cubeFolder.add(createCube, 'height', 0, 4, .1);
+cubeFolder.add(createCube, 'depth', 0, 4, .1);
+cubeFolder.addColor(createCube, 'color');
+cubeFolder.add(createCube, 'create');
+
+let sphereFolder = gui.addFolder('Create Sphere');
+sphereFolder.add(createSphere, "radius", 0.1, 2, 0.1);
+sphereFolder.add(createSphere, "widthSegments", 3, 64, 1);
+sphereFolder.add(createSphere, "heightSegments", 2, 32, 1);
+sphereFolder.addColor(createSphere, 'color');
+sphereFolder.add(createSphere, 'create');
 
 let editFolder = null;
 let changeFolder = false; // Used to determine if the edit Folder needs new values (Different shape or different square)
@@ -185,6 +189,69 @@ const validateObjectCoordinates = (selectedShape) => {
   }
 }
 
+const removeIndexFromArray = (arr, value) => {
+  for(let index = 0; index < arr.length; index ++)
+  {
+    if(arr[index].geometry.uuid == value)
+    {
+      arr.splice(index, 1);
+      break;
+    }
+  }
+}
+
+const removeChildFromScene = (scene, value) => {
+  for(let index = 3; index < scene.children.length; index ++)
+  {
+
+    if(scene.children[index].geometry.uuid == value)
+    {
+      scene.children.splice(index,1);
+      break;
+    }
+  }
+}
+
+const disposeObject = (selectedShape) => {
+  delete shapes[selectedShape.objectID];
+  selectedShape.sphereGeometry.dispose();
+  selectedShape.sphereMaterial.dispose();
+  selectedShape.sphereMesh.geometry.dispose();
+  selectedShape.sphereMesh.material.dispose();
+  scene.remove(selectedShape);
+}
+
+const replaceSphere = (sphere, newParameterValue, newParameterName) => {
+
+    let xPosition = sphere.sphereMesh.position.x;
+    let yPosition = sphere.sphereMesh.position.y;
+    let zPosition = sphere.sphereMesh.position.z;
+    let widthSegment = sphere.widthSegments;
+    let heightSegment = sphere.heightSegments;
+    let radius = sphere.radius;
+    let color = sphere.sphereMesh.material.color;
+
+    switch(newParameterName)
+    {
+      case 'radius':
+        sphere = new Sphere(scene, color, newParameterValue, widthSegment, heightSegment);
+        break;
+      case 'widthSegment':
+        sphere = new Sphere(scene, color, radius, newParameterValue, heightSegment);
+        break;
+      case 'heightSegment':
+        sphere = new Sphere(scene, color, radius, widthSegment, newParameterValue);
+        break;
+      default:
+        break;
+    }
+
+    dragObjectArray.push(sphere.sphereMesh);
+    shapes[sphere.objectID] = sphere;
+    sphere.sphereMesh.position.set(xPosition, yPosition, zPosition);
+    selectedShape = sphere;
+}
+
 const renderLoop = () => {
   if(selectedShape)
   {
@@ -195,15 +262,11 @@ const renderLoop = () => {
       switch(selectedShape.objectType)
     {
       case 'Cube':
-        selectedCube['width'] = selectedShape.cubeGeometry.parameters.width;
-        selectedCube['height'] = selectedShape.cubeGeometry.parameters.height;
-        selectedCube['depth'] = selectedShape.cubeGeometry.parameters.depth;
-        selectedCube['color'] = selectedShape.color;
         editFolder = gui.addFolder("Edit Cube");
         editFolder.add(selectedShape, 'width', 0, 4).onChange((value) => {
           selectedShape.cubeMesh.scale.x = (value / selectedShape.widthDivisionNumber);
           selectedShape.cubeGeometry.parameters.width = value;
-        })
+        });
         editFolder.add(selectedShape, 'height', 0, 4).onChange((value) => {
           selectedShape.cubeMesh.scale.y = (value / selectedShape.heightDivisionNumber);
           selectedShape.cubeGeometry.parameters.height = value
@@ -211,12 +274,33 @@ const renderLoop = () => {
         editFolder.add(selectedCube, 'depth', 0, 4).onChange((value) => {
           selectedShape.cubeMesh.scale.z = (value / selectedShape.depthDivisionNumber);
           selectedShape.cubeGeometry.parameters.depth = value;
-        })
+        });
         editFolder.addColor(selectedCube, 'color').onChange( (value) => {
           selectedShape.cubeMesh.material.color.set(value);
           selectedShape.color = value;
         });
         editFolder.add(selectedCube, 'edit');
+
+      case "Sphere":
+        editFolder = gui.addFolder("Edit Sphere");
+        editFolder.add(selectedShape, "radius", .1, 2, 0.1).onChange((value) => {
+          
+          console.log(selectedShape)
+          removeIndexFromArray(dragObjectArray, selectedShape.objectID);
+          disposeObject(selectedShape);
+          removeChildFromScene(scene, selectedShape.objectID);
+          replaceSphere(selectedShape, value, 'radius')
+        });
+        editFolder.add(selectedShape, "widthSegments", 3, 64, 1).onChange((value) => {
+          selectedShape.sphereGeometry.parameters.widthSegments = value;
+        });
+        editFolder.add(selectedShape, "heightSegments", 3, 32, 1).onChange((value) => {
+          selectedShape.sphereGeometry.parameters.heightSegments = value;
+        });
+        editFolder.addColor(selectedShape, 'color').onChange((value) => {
+          selectedShape.sphereMesh.material.color.set(value);
+        });
+
     }
     }
   }
