@@ -8,23 +8,25 @@ const gui = new GUI();
 const rayCaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
+let isOverGui = false;
+const guiBox = document.querySelector('.dg.ac');
+guiBox.addEventListener('mouseenter', () => isOverGui = true);
+guiBox.addEventListener('mouseleave', () => isOverGui = false);
+
 let dragObjectArray = [];
 let shapes = {};
 let selectedShape = "";
 
 let createCube = {
-  width: 0,
-  height: 0,
-  depth: 0,
+  width: 0.1,
+  height: 0.1,
+  depth: 0.1,
   color: "#787FE8",
   create: () => {
-    if( (createCube['width'] != 0  && createCube['height'] != 0) || (createCube['width'] != 0 && createCube['depth'] != 0 ) || (createCube['height'] != 0 && createCube['depth'] != 0))
-    {
       let cube = new Cube(scene, createCube['color'], createCube['width'], createCube['height'], createCube['depth']);
       cube.cubeMesh.position.y = 0.50 + (0.485 * (cube.cubeGeometry.parameters.height - 1));
       dragObjectArray.push(cube.cubeMesh);
       shapes[cube.objectID] = cube;
-    }
   }
 }
 
@@ -41,9 +43,9 @@ let createSphere = {
 }
 
 let cubeFolder = gui.addFolder("Create Cube");
-cubeFolder.add(createCube, 'width', 0, 4, .1);
-cubeFolder.add(createCube, 'height', 0, 4, .1);
-cubeFolder.add(createCube, 'depth', 0, 4, .1);
+cubeFolder.add(createCube, 'width', 0.1, 4, .1);
+cubeFolder.add(createCube, 'height', 0.1, 4, .1);
+cubeFolder.add(createCube, 'depth', 0.1, 4, .1);
 cubeFolder.addColor(createCube, 'color');
 cubeFolder.add(createCube, 'create');
 
@@ -91,8 +93,16 @@ dragController.addEventListener('dragstart', (event) => {
     {
       case 'Cube':
         gui.removeFolder(editFolder);
+        editFolder = null;
+        break;
+      case "Sphere":
+        gui.removeFolder(editFolder);
+        editFolder = null;
+        break;
+      default:
+        break;
     }
-    editFolder = null;
+    
   }
   orbitController.enabled = false;
   selectedShape = shapes[event.object.geometry.uuid];
@@ -116,6 +126,9 @@ window.addEventListener('orientationchange', () => {
 })
 
 window.addEventListener('click', (event) => {
+
+  if(isOverGui == false)
+  {
     pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
     pointer.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
@@ -135,6 +148,7 @@ window.addEventListener('click', (event) => {
             }
         }
     } 
+  }
 })
 
 const validateObjectCoordinates = (selectedShape) => {
@@ -186,6 +200,50 @@ const validateObjectCoordinates = (selectedShape) => {
         selectedShape.cubeMesh.position.z = -5.00 + (selectedShape.cubeGeometry.parameters.depth / 2);
       }
     }
+  }else if(selectedShape.objectType == 'Sphere')
+  {
+    if(selectedShape.sphereMesh.position.y < 3)
+    {
+      if(selectedShape.sphereMesh.position.y < selectedShape.sphereGeometry.parameters.radius)
+      {
+        selectedShape.sphereMesh.position.y = selectedShape.sphereGeometry.parameters.radius;
+      }
+    } else
+    {
+      if(selectedShape.sphereMesh.position.y > (5 - selectedShape.sphereGeometry.parameters.radius))
+      {
+        selectedShape.sphereMesh.position.y = (5 - selectedShape.sphereGeometry.parameters.radius);
+      }
+    }
+
+     if(selectedShape.sphereMesh.position.x > 0)
+    {
+      if(selectedShape.sphereMesh.position.x > (5.00 - selectedShape.sphereGeometry.parameters.radius))
+      {
+        selectedShape.sphereMesh.position.x = (5.00 - selectedShape.sphereGeometry.parameters.radius);
+      }
+    }
+    else
+    {
+      if(selectedShape.sphereMesh.position.x < -5.00 + (selectedShape.sphereGeometry.parameters.radius))
+      {
+        selectedShape.sphereMesh.position.x = -5.00 + (selectedShape.sphereGeometry.parameters.radius);
+      }
+    }
+     if(selectedShape.sphereMesh.position.z > 0)
+    {
+      if(selectedShape.sphereMesh.position.z > 5.00 - (selectedShape.sphereGeometry.parameters.radius))
+      {
+        selectedShape.sphereMesh.position.z = 5.00 - (selectedShape.sphereGeometry.parameters.radius);
+      }
+    }
+    else
+    {
+      if(selectedShape.sphereMesh.position.z < -5.00 + (selectedShape.sphereGeometry.parameters.radius))
+      {
+        selectedShape.sphereMesh.position.z = -5.00 + (selectedShape.sphereGeometry.parameters.radius);
+      }
+    }
   }
 }
 
@@ -229,30 +287,31 @@ const replaceSphere = (sphere, newParameterValue, newParameterName) => {
     let widthSegment = sphere.widthSegments;
     let heightSegment = sphere.heightSegments;
     let radius = sphere.radius;
-    let color = sphere.sphereMesh.material.color;
+    let color = sphere.sphereMesh.material.color.getHex();
+    let newSphere = null;
 
     switch(newParameterName)
     {
       case 'radius':
-        sphere = new Sphere(scene, color, newParameterValue, widthSegment, heightSegment);
+        newSphere = new Sphere(scene, color, newParameterValue, widthSegment, heightSegment);
         break;
       case 'widthSegment':
-        sphere = new Sphere(scene, color, radius, newParameterValue, heightSegment);
+        newSphere = new Sphere(scene, color, radius, newParameterValue, heightSegment);
         break;
       case 'heightSegment':
-        sphere = new Sphere(scene, color, radius, widthSegment, newParameterValue);
+        newSphere = new Sphere(scene, color, radius, widthSegment, newParameterValue);
         break;
       default:
         break;
     }
 
-    dragObjectArray.push(sphere.sphereMesh);
-    shapes[sphere.objectID] = sphere;
-    sphere.sphereMesh.position.set(xPosition, yPosition, zPosition);
-    selectedShape = sphere;
+    dragObjectArray.push(newSphere.sphereMesh);
+    shapes[newSphere.objectID] = newSphere;
+    newSphere.sphereMesh.position.set(xPosition, yPosition, zPosition);
+    selectedShape = newSphere;
 }
 
-const renderLoop = () => {
+const renderLoop = async () => {
   if(selectedShape)
   {
     validateObjectCoordinates(selectedShape);
@@ -263,42 +322,46 @@ const renderLoop = () => {
     {
       case 'Cube':
         editFolder = gui.addFolder("Edit Cube");
-        editFolder.add(selectedShape, 'width', 0, 4).onChange((value) => {
+        editFolder.add(selectedShape, 'width', 0.1, 4, 0.1).onChange((value) => {
           selectedShape.cubeMesh.scale.x = (value / selectedShape.widthDivisionNumber);
           selectedShape.cubeGeometry.parameters.width = value;
         });
-        editFolder.add(selectedShape, 'height', 0, 4).onChange((value) => {
+        editFolder.add(selectedShape, 'height', 0.1, 4, 0.1).onChange((value) => {
           selectedShape.cubeMesh.scale.y = (value / selectedShape.heightDivisionNumber);
           selectedShape.cubeGeometry.parameters.height = value
         });
-        editFolder.add(selectedCube, 'depth', 0, 4).onChange((value) => {
+        editFolder.add(selectedShape, 'depth', 0.1, 4, 0.1).onChange((value) => {
           selectedShape.cubeMesh.scale.z = (value / selectedShape.depthDivisionNumber);
           selectedShape.cubeGeometry.parameters.depth = value;
         });
-        editFolder.addColor(selectedCube, 'color').onChange( (value) => {
+        editFolder.addColor(selectedShape, 'color').onChange( (value) => {
           selectedShape.cubeMesh.material.color.set(value);
           selectedShape.color = value;
         });
-        editFolder.add(selectedCube, 'edit');
-
+        break;
       case "Sphere":
         editFolder = gui.addFolder("Edit Sphere");
         editFolder.add(selectedShape, "radius", .1, 2, 0.1).onChange((value) => {
-          
-          console.log(selectedShape)
+          removeIndexFromArray(dragObjectArray, selectedShape.objectID);
+          removeChildFromScene(scene, selectedShape.objectID);
+          disposeObject(selectedShape);
+          replaceSphere(selectedShape, value, 'radius');
+        });
+        editFolder.add(selectedShape, "widthSegments", 3, 64, 1).onChange((value) => {
           removeIndexFromArray(dragObjectArray, selectedShape.objectID);
           disposeObject(selectedShape);
           removeChildFromScene(scene, selectedShape.objectID);
-          replaceSphere(selectedShape, value, 'radius')
-        });
-        editFolder.add(selectedShape, "widthSegments", 3, 64, 1).onChange((value) => {
-          selectedShape.sphereGeometry.parameters.widthSegments = value;
+          replaceSphere(selectedShape, value, 'widthSegment');
         });
         editFolder.add(selectedShape, "heightSegments", 3, 32, 1).onChange((value) => {
-          selectedShape.sphereGeometry.parameters.heightSegments = value;
+          removeIndexFromArray(dragObjectArray, selectedShape.objectID);
+          disposeObject(selectedShape);
+          removeChildFromScene(scene, selectedShape.objectID);
+          replaceSphere(selectedShape, value, 'heightSegment');
         });
         editFolder.addColor(selectedShape, 'color').onChange((value) => {
           selectedShape.sphereMesh.material.color.set(value);
+          selectedShape.color = value;
         });
 
     }
