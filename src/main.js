@@ -42,6 +42,25 @@ let createSphere = {
   }
 }
 
+let deleteShape = {
+  "Delete Cube": () => {
+    removeIndexFromArray(dragObjectArray, selectedShape.objectID);
+    removeChildFromScene(scene, selectedShape.objectID);
+    disposeCube(selectedShape);
+    selectedShape = null;
+    gui.removeFolder(editFolder);
+    editFolder = null;
+  },
+  "Delete Sphere": () => {
+    removeIndexFromArray(dragObjectArray, selectedShape.objectID);
+    removeChildFromScene(scene, selectedShape.objectID);
+    disposeSphere(selectedShape);
+    selectedShape = null;
+    gui.removeFolder(editFolder);
+    editFolder = null;
+  }
+}
+
 let cubeFolder = gui.addFolder("Create Cube");
 cubeFolder.add(createCube, 'width', 0.1, 4, .1);
 cubeFolder.add(createCube, 'height', 0.1, 4, .1);
@@ -58,7 +77,6 @@ sphereFolder.add(createSphere, 'create');
 
 let editFolder = null;
 let changeFolder = false; // Used to determine if the edit Folder needs new values (Different shape or different square)
-let lastSelectedShape = null;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50);
@@ -89,24 +107,14 @@ dragController.addEventListener('dragstart', (event) => {
   else
   {
     changeFolder = true;
-    switch(lastSelectedShape)
+    if (editFolder != null)
     {
-      case 'Cube':
         gui.removeFolder(editFolder);
         editFolder = null;
-        break;
-      case "Sphere":
-        gui.removeFolder(editFolder);
-        editFolder = null;
-        break;
-      default:
-        break;
     }
-    
   }
   orbitController.enabled = false;
   selectedShape = shapes[event.object.geometry.uuid];
-  lastSelectedShape = shapes[event.object.geometry.uuid]['objectType']
 })
 
 dragController.addEventListener('dragend', () => {
@@ -270,12 +278,17 @@ const removeChildFromScene = (scene, value) => {
   }
 }
 
-const disposeObject = (selectedShape) => {
+const disposeSphere = (selectedShape) => {
   delete shapes[selectedShape.objectID];
   selectedShape.sphereGeometry.dispose();
   selectedShape.sphereMaterial.dispose();
-  selectedShape.sphereMesh.geometry.dispose();
-  selectedShape.sphereMesh.material.dispose();
+  scene.remove(selectedShape);
+}
+
+const disposeCube = (selectedShape) => {
+  delete shapes[selectedShape.objectID];
+  selectedShape.cubeGeometry.dispose();
+  selectedShape.cubeMaterial.dispose();
   scene.remove(selectedShape);
 }
 
@@ -338,24 +351,25 @@ const renderLoop = async () => {
           selectedShape.cubeMesh.material.color.set(value);
           selectedShape.color = value;
         });
+        editFolder.add(deleteShape, 'Delete Cube');
         break;
       case "Sphere":
         editFolder = gui.addFolder("Edit Sphere");
         editFolder.add(selectedShape, "radius", .1, 2, 0.1).onChange((value) => {
           removeIndexFromArray(dragObjectArray, selectedShape.objectID);
           removeChildFromScene(scene, selectedShape.objectID);
-          disposeObject(selectedShape);
+          disposeSphere(selectedShape);
           replaceSphere(selectedShape, value, 'radius');
         });
         editFolder.add(selectedShape, "widthSegments", 3, 64, 1).onChange((value) => {
           removeIndexFromArray(dragObjectArray, selectedShape.objectID);
-          disposeObject(selectedShape);
+          disposeSphere(selectedShape);
           removeChildFromScene(scene, selectedShape.objectID);
           replaceSphere(selectedShape, value, 'widthSegment');
         });
         editFolder.add(selectedShape, "heightSegments", 3, 32, 1).onChange((value) => {
           removeIndexFromArray(dragObjectArray, selectedShape.objectID);
-          disposeObject(selectedShape);
+          disposeSphere(selectedShape);
           removeChildFromScene(scene, selectedShape.objectID);
           replaceSphere(selectedShape, value, 'heightSegment');
         });
@@ -363,7 +377,10 @@ const renderLoop = async () => {
           selectedShape.sphereMesh.material.color.set(value);
           selectedShape.color = value;
         });
-
+        editFolder.add(deleteShape, 'Delete Sphere');
+        break;
+      default:
+        break;
     }
     }
   }
